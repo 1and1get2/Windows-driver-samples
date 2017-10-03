@@ -19,12 +19,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{EFB282A8-A881-44E7-964D-F068A4FD19C9}</ProjectGuid>
+    <ProjectGuid>{CF30C8F0-084B-4E2D-A9C3-E76B4E9D0184}</ProjectGuid>
     <RootNamespace>$(MSBuildProjectName)</RootNamespace>
     <UMDF_VERSION_MAJOR>1</UMDF_VERSION_MAJOR>
     <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">Win32</Platform>
-    <SampleGuid>{BA45F248-4EC7-4AF6-A0B1-438FABDF4722}</SampleGuid>
+    <SampleGuid>{A88B1CA4-202D-4915-94D1-94E8D74FCFF5}</SampleGuid>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -81,11 +81,6 @@
       <WppDllMacro>true</WppDllMacro>
       <WppScanConfigurationData>..\internal.h</WppScanConfigurationData>
     </ClCompile>
-    <Inf Include="virtualserial.inx">
-      <Architecture>$(InfArch)</Architecture>
-      <SpecifyArchitecture>true</SpecifyArchitecture>
-      <CopyOutput>.\$(IntDir)\virtualserial.inf</CopyOutput>
-    </Inf>
     <OtherWpp Include="virtualserial.rc">
       <WppEnabled>true</WppEnabled>
       <WppDllMacro>true</WppDllMacro>
@@ -240,9 +235,8 @@
     <ResourceCompile Include="virtualserial.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Inf Exclude="@(Inf)" Include="*.inf" />
+    <Inf Exclude="@(Inf)" Include="*.inx" />
     <FilesToPackage Include="$(TargetPath)" Condition="'$(ConfigurationType)'=='Driver' or '$(ConfigurationType)'=='DynamicLibrary'" />
-    <FilesToPackage Include="@(Inf->'%(CopyOutput)')" Condition="'@(Inf)'!=''" />
   </ItemGroup>
   <ItemGroup>
     <None Exclude="@(None)" Include="*.txt;*.htm;*.html" />

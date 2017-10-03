@@ -18,6 +18,14 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\kmdf_driver\osrusbfx2.vcxproj">
+      <Project>{837F98CF-D3A4-472C-BACC-47950340E57B}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\umdf_filter\WUDFOsrUsbFilter.vcxproj">
+      <Project>{ADCCB27A-E522-4367-86B9-9C9DF2636B93}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <PropertyGroup Label="PropertySheets">
     <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
     <ConfigurationType>Utility</ConfigurationType>
@@ -27,8 +35,8 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{3EF9240F-7E95-49A7-8B0D-5F7061655764}</ProjectGuid>
-    <SampleGuid>{0CA520A9-E977-438B-8DC7-505D2B17D810}</SampleGuid>
+    <ProjectGuid>{10E372EF-AE85-4528-919C-A261253EDDAE}</ProjectGuid>
+    <SampleGuid>{4535F3DF-5A13-4953-9565-74B05B8FA4C6}</SampleGuid>
     <RootNamespace>$(MSBuildProjectName)</RootNamespace>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -73,18 +81,6 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <!--Inf Include="DriverInf.inv" /-->
-    <FilesToPackage Include="@(Inf->'%(CopyOutput)')" Condition="'@(Inf)'!=''" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\kmdf_driver\osrusbfx2.vcxproj">
-      <Project>{23EAF474-B558-4457-B03C-164DA83B7575}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\umdf_filter\WUDFOsrUsbFilter.vcxproj">
-      <Project>{0149B701-5356-434C-AC8C-07CAA1D9A4AA}</Project>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

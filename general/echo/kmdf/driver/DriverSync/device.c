@@ -59,7 +59,11 @@ Return Value:
     //
     pnpPowerCallbacks.EvtDeviceSelfManagedIoInit    = EchoEvtDeviceSelfManagedIoStart;
     pnpPowerCallbacks.EvtDeviceSelfManagedIoSuspend = EchoEvtDeviceSelfManagedIoSuspend;
-    #pragma prefast(suppress: 28024, "Function used for both Init and Restart Callbacks")
+
+    //
+    // Function used for both Init and Restart Callbacks
+    //
+    #pragma warning(suppress: 28024)
     pnpPowerCallbacks.EvtDeviceSelfManagedIoRestart = EchoEvtDeviceSelfManagedIoStart;
 
     //
@@ -72,17 +76,6 @@ Return Value:
     WdfDeviceInitSetRequestAttributes(DeviceInit, &attributes);
 
     WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, DEVICE_CONTEXT);
-
-    //
-    // By not setting the synchronization scope and using the default, there is
-    // no locking between any of the callbacks in this driver.
-    //
-    // We will create a sequential queue so all of  the EvtIoXxx callbacks are
-    // serialized against each other (at least until the request is completed),
-    // but the cancel routine and the timer DPC are not synchronized against the
-    // queue's EvtIoXxx callbacks.
-    //
-    // attributes.SynchronizationScope = ...
 
     status = WdfDeviceCreate(&DeviceInit, &attributes, &device);
 

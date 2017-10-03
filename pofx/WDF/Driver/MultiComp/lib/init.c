@@ -385,9 +385,14 @@ Return value:
     WDF_OBJECT_ATTRIBUTES_INIT(&objectAttributes);
     objectAttributes.ParentObject = Initializer; // auto-delete when parent 
                                                  // deleted
-    #pragma prefast(suppress:28160, "memorySize > 0")
+                                                 
+
+    //
+    // Suppress the warning that memorySize must be greater than zero
+    //       
+    #pragma warning(suppress:28160)
     status = WdfMemoryCreate(&objectAttributes,
-                             NonPagedPool,
+                             NonPagedPoolNx,
                              0, // PoolTag
                              memorySize,
                              &memory, 
@@ -424,7 +429,11 @@ Return value:
                   status);
             goto exit;
         }
-        #pragma prefast(suppress:28160, "minorFunctionsSize > 0")
+        
+        //
+        // Suppress the warning that minorFunctionsSize must be greater than zero
+        //       
+        #pragma warning(suppress:28160)
         status = WdfMemoryCopyFromBuffer(memory,
                                          minorFunctionsOffset,
                                          memoryBuffer->MinorFunctions,
@@ -724,7 +733,7 @@ Return value:
     WDF_OBJECT_ATTRIBUTES_INIT(&objectAttributes);
     objectAttributes.ParentObject = Device; // auto-delete when parent deleted
     status = WdfMemoryCreate(&objectAttributes,
-                             NonPagedPool,
+                             NonPagedPoolNx,
                              0, // PoolTag
                              powerIrpPreprocessInfoSize,
                              &memory, 
@@ -968,7 +977,7 @@ PfhInitializePowerFrameworkSettings(
     WDF_OBJECT_ATTRIBUTES_INIT(&objectAttributes);
     objectAttributes.ParentObject = Device; // auto-delete when parent deleted
     status = WdfMemoryCreate(&objectAttributes,
-                             NonPagedPool,
+                             NonPagedPoolNx,
                              0, // PoolTag
                              pofxDeviceInfoSize,
                              &memory, 
@@ -1056,7 +1065,7 @@ PfhInitializePowerFrameworkSettings(
         WDF_OBJECT_ATTRIBUTES_INIT(&objectAttributes);
         objectAttributes.ParentObject = Device;//auto-delete when parent deleted
         status = WdfMemoryCreate(&objectAttributes,
-                                 NonPagedPool,
+                                 NonPagedPoolNx,
                                  0, // PoolTag
                                  idleStatesSize,
                                  &memory,
@@ -1112,7 +1121,7 @@ PfhInitializePowerFrameworkSettings(
     WDF_OBJECT_ATTRIBUTES_INIT(&objectAttributes);
     objectAttributes.ParentObject = Device; // auto-delete when parent deleted
     status = WdfMemoryCreate(&objectAttributes,
-                             NonPagedPool,
+                             NonPagedPoolNx,
                              0, // PoolTag
                              componentInfoSize,
                              &memory, 

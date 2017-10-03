@@ -158,6 +158,18 @@ Return Value:
     // Fill in a callback for destroy, and our QUEUE_CONTEXT size
     //
     WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, QUEUE_CONTEXT);
+
+    //
+    // By not setting the synchronization scope and using the default, there is
+    // no locking between any of the callbacks in this driver.
+    //
+    // We will create a sequential queue so all of  the EvtIoXxx callbacks are
+    // serialized against each other (at least until the request is completed),
+    // but the cancel routine and the timer DPC are not synchronized against the
+    // queue's EvtIoXxx callbacks.
+    //
+    // attributes.SynchronizationScope = ...
+
     attributes.EvtDestroyCallback = EchoEvtIoQueueContextDestroy;
 
     status = WdfIoQueueCreate(
@@ -192,7 +204,7 @@ Return Value:
         KdPrint(("WdfSpinLockCreate failed 0x%x\n",status));
         return status;
     }
-    
+
     //
     // Create the Queue timer
     //
@@ -234,16 +246,15 @@ Return Value:
     PAGED_CODE();
 
     //
-    // Create a WDFTIMER object
+    // Create a periodic timer.
+    //
+    // By not setting the synchronization scope and using the default at WdfIoQueueCreate,
+    // we are explicitly *not* serializing against the queue's lock. Instead, we will do
+    // that on our own.
     //
     WDF_TIMER_CONFIG_INIT_PERIODIC(&timerConfig, EchoEvtTimerFunc, Period);
 
     WDF_OBJECT_ATTRIBUTES_INIT(&timerAttributes);
-
-    //
-    // We are explicitly *not* serializing against the queue's lock, we will do
-    // that on our own.
-    //
     timerAttributes.ParentObject = Queue;
 
     Status = WdfTimerCreate(
@@ -456,9 +467,9 @@ EchoSetCurrentRequest(
     queueContext->CurrentStatus  = STATUS_SUCCESS;
 
     //
-    // Set the cancel routine under the lock, otherwise if we set it outside 
-    // of the lock, the timer could run and attempt to mark the request 
-    // uncancelable before we can mark it cancelable on this thread. Use 
+    // Set the cancel routine under the lock, otherwise if we set it outside
+    // of the lock, the timer could run and attempt to mark the request
+    // uncancelable before we can mark it cancelable on this thread. Use
     // WdfRequestMarkCancelableEx here to prevent to deadlock with ourselves
     // (cancel routine tries to acquire the queue object lock).
     //
@@ -516,7 +527,7 @@ Return Value:
 
     _Analysis_assume_(Length > 0);
 
-    KdPrint(("EchoEvtIoRead Called! Queue 0x%p, Request 0x%p Length %d\n",
+    KdPrint(("EchoEvtIoRead Called! Queue 0x%p, Request 0x%p Length %Iu\n",
                             Queue,Request,Length));
     //
     // No data to read
@@ -611,11 +622,11 @@ Return Value:
 
     _Analysis_assume_(Length > 0);
 
-    KdPrint(("EchoEvtIoWrite Called! Queue 0x%p, Request 0x%p Length %d\n",
+    KdPrint(("EchoEvtIoWrite Called! Queue 0x%p, Request 0x%p Length %Iu\n",
                             Queue,Request,Length));
 
     if( Length > MAX_WRITE_LENGTH ) {
-        KdPrint(("EchoEvtIoWrite Buffer Length to big %d, Max is %d\n",
+        KdPrint(("EchoEvtIoWrite Buffer Length to big %Iu, Max is %d\n",
                  Length,MAX_WRITE_LENGTH));
         WdfRequestCompleteWithInformation(Request, STATUS_BUFFER_OVERFLOW, 0L);
         return;
@@ -638,9 +649,9 @@ Return Value:
         queueContext->Length = 0L;
     }
 
-    queueContext->Buffer = ExAllocatePoolWithTag(NonPagedPool, Length, 'sam1');
+    queueContext->Buffer = ExAllocatePoolWithTag(NonPagedPoolNx, Length, 'sam1');
     if( queueContext->Buffer == NULL ) {
-        KdPrint(("EchoEvtIoWrite: Could not allocate %d byte buffer\n",Length));
+        KdPrint(("EchoEvtIoWrite: Could not allocate %Iu byte buffer\n",Length));
         WdfRequestComplete(Request, STATUS_INSUFFICIENT_RESOURCES);
         return;
     }
@@ -746,7 +757,7 @@ Return Value:
             //
         }
     }
-    
+
     WdfSpinLockRelease(queueContext->SpinLock);
 
     //

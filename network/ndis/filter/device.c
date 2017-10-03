@@ -53,14 +53,14 @@ FilterRegisterDevice(
     Status = NdisRegisterDeviceEx(
                 FilterDriverHandle,
                 &DeviceAttribute,
-                &DeviceObject,
+                &NdisDeviceObject,
                 &NdisFilterDeviceHandle
                 );
 
 
     if (Status == NDIS_STATUS_SUCCESS)
     {
-        FilterDeviceExtension = NdisGetDeviceReservedExtension(DeviceObject);
+        FilterDeviceExtension = NdisGetDeviceReservedExtension(NdisDeviceObject);
 
         FilterDeviceExtension->Signature = 'FTDR';
         FilterDeviceExtension->Handle = FilterDriverHandle;
@@ -183,7 +183,7 @@ FilterDeviceIoControl(
 
             break;
 
-        case IOCTL_FILTER_ENUERATE_ALL_INSTANCES:
+        case IOCTL_FILTER_ENUMERATE_ALL_INSTANCES:
 
             InputBuffer = OutputBuffer = (PUCHAR)Irp->AssociatedIrp.SystemBuffer;
             InputBufferLength = IrpSp->Parameters.DeviceIoControl.InputBufferLength;

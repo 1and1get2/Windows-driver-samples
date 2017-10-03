@@ -19,11 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{FA4BC0C3-DA1C-46DA-BFF4-AA448B5D0A0A}</ProjectGuid>
+    <ProjectGuid>{A0CFCF38-1874-446B-92D5-584D180B12F8}</ProjectGuid>
     <RootNamespace>$(MSBuildProjectName)</RootNamespace>
     <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">Win32</Platform>
-    <SampleGuid>{C44D3FE1-3E60-4619-A1F9-E34A55C6FCA7}</SampleGuid>
+    <SampleGuid>{8C7CD3A0-C931-4AAB-943F-0AB402029733}</SampleGuid>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -151,7 +151,7 @@
     <PropertyGroup>
       <CTRPP_ODIR>$([System.IO.Path]::GetDirectoryName($(ProjectDir)\$(IntDir)))</CTRPP_ODIR>
     </PropertyGroup>
-    <Exec Command="&quot;$(WDKContentRoot)\bin\x86\ctrpp.exe&quot; kcs.man  -prefix Kcs -o &quot;$(CTRPP_ODIR)\KcsCounters.h&quot; -ch &quot;$(CTRPP_ODIR)\KcsCounters_counters.h&quot; -rc &quot;$(CTRPP_ODIR)\KcsCounters.rc&quot;" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Exec Command="&quot;ctrpp.exe&quot; kcs.man  -prefix Kcs -o &quot;$(CTRPP_ODIR)\KcsCounters.h&quot; -ch &quot;$(CTRPP_ODIR)\KcsCounters_counters.h&quot; -rc &quot;$(CTRPP_ODIR)\KcsCounters.rc&quot;" WorkingDirectory="$(MSBuildProjectDirectory)" />
   </Target>
   <ItemGroup>
     <ClCompile Include="Kcs.c" />
@@ -160,7 +160,6 @@
   <ItemGroup>
     <Inf Exclude="@(Inf)" Include="*.inf" />
     <FilesToPackage Include="$(TargetPath)" Condition="'$(ConfigurationType)'=='Driver' or '$(ConfigurationType)'=='DynamicLibrary'" />
-    <FilesToPackage Include="@(Inf->'%(CopyOutput)')" Condition="'@(Inf)'!=''" />
   </ItemGroup>
   <ItemGroup>
     <None Exclude="@(None)" Include="*.txt;*.htm;*.html" />

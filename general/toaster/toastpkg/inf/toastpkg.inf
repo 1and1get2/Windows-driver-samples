@@ -23,7 +23,7 @@
 Signature="$WINDOWS NT$"
 Class=TOASTER
 ClassGuid={B85B7C50-6A01-11d2-B841-00C04FAD5171}
-Provider=%ToastRUs%
+Provider=%ProviderName%
 DriverVer=09/21/2006,6.0.5736.1
 CatalogFile.NTx86  = tostx86.cat
 CatalogFile.NTIA64 = tostia64.cat
@@ -32,7 +32,6 @@ CatalogFile.NTAMD64 = tstamd64.cat
 [DestinationDirs]
 DefaultDestDir = 12
 CoInstaller_CopyFiles = 11
-ToasterClassInstallerCopyFiles = 11
 
 ; ================= Class section =====================
 
@@ -43,11 +42,7 @@ CopyFiles=ToasterClassInstallerCopyFiles
 [ToasterClassReg]
 HKR,,,0,%ClassName%
 HKR,,Icon,,100
-HKR,,Installer32,,"tostrcls.dll,ToasterClassInstaller"
 HKR,,DeviceCharacteristics,0x10001,0x100        ; Use same security checks on relative opens
-
-[ToasterClassInstallerCopyFiles]
-tostrcls.dll
 
 ;*****************************************
 ; Toaster Device  Install Section
@@ -56,11 +51,6 @@ tostrcls.dll
 [Manufacturer]
 %ToastRUs%=ToastRUs,NTx86, NTia64, NTamd64
 
-; For Win2K
-[ToastRUs]
-%ToasterDevice.DeviceDesc%=Toaster_Device, {b85b7c50-6a01-11d2-b841-00c04fad5171}\MsToaster
-
-; For XP and later
 [ToastRUs.NTx86]
 %ToasterDevice.DeviceDesc%=Toaster_Device, {b85b7c50-6a01-11d2-b841-00c04fad5171}\MsToaster
 
@@ -125,13 +115,13 @@ OriginalInfSourcePath = %1%
 [SourceDisksFiles]
 toaster.sys  = 1,,
 tostrco2.dll = 1,,
-tostrcls.dll = 1,,
 
 [Strings]
 SPSVCINST_ASSOCSERVICE= 0x00000002
+ProviderName = "TODO-Set-Provider"
 ToastRUs = "Toast'R'Us"
 ClassName = "Toaster"
 DiskId1 = "Toaster Device Installation Disk #1"
 ToasterDevice.DeviceDesc = "Toaster Package Sample Toaster"
-toaster.SVCDESC = "Microsoft Toaster Device Driver"
+toaster.SVCDESC = "Toaster Device Driver"
 FriendlyNameFormat = "ToasterDevice%1!u!"

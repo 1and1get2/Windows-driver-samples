@@ -3,25 +3,22 @@
   <ItemGroup>
     <Filter Include="Source Files">
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx;*</Extensions>
-      <UniqueIdentifier>{BFF3D918-3BBB-4AF1-B1A2-C2A4FD8E82E8}</UniqueIdentifier>
+      <UniqueIdentifier>{E10CB9FB-4852-4353-85F5-667D4D2A13DD}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files">
       <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
-      <UniqueIdentifier>{3BC12FA6-2491-4DA4-86C0-8F10AA4DB124}</UniqueIdentifier>
+      <UniqueIdentifier>{EC8940D8-5E2B-49AB-AB85-7CABCAE698D1}</UniqueIdentifier>
     </Filter>
     <Filter Include="Resource Files">
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms;man;xml</Extensions>
-      <UniqueIdentifier>{004102F6-6CB6-4E30-A1D8-B663D4B8CE08}</UniqueIdentifier>
+      <UniqueIdentifier>{42A1FDF4-6DB4-41B2-9423-8002A20D1B0D}</UniqueIdentifier>
     </Filter>
     <Filter Include="Driver Files">
       <Extensions>inf;inv;inx;mof;mc;</Extensions>
-      <UniqueIdentifier>{38B34A48-263B-481A-81DE-81BF490980CD}</UniqueIdentifier>
+      <UniqueIdentifier>{FD9F921C-D1EF-421B-A692-F23423B32E64}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <FilesToPackage Include=".\Debug\\simgpio.inf">
-      <Filter>Driver Files</Filter>
-    </FilesToPackage>
     <Inf Include=".\simgpio.inx">
       <Filter>Driver Files</Filter>
     </Inf>

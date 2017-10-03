@@ -11,9 +11,9 @@ CatalogFile=WpdServiceSampleDriver.cat
 DriverVer=01/24/2007,1.1.1.1
 
 [Manufacturer]
-%MSFTWUDF%=Microsoft,NT$ARCH$
+%Mfg%=Standard,NT$ARCH$
 
-[Microsoft.NT$ARCH$]
+[Standard.NT$ARCH$]
 %BasicDeviceName%=Basic_Install,WUDF\WpdService
 
 [SourceDisksFiles]
@@ -65,6 +65,7 @@ ServiceBinary=%12%\WUDFRd.sys
 
 [DestinationDirs]
 System32Copy=12,UMDF ; copy to system32\drivers\umdf
+CoInstallers_CopyFiles= 11
 
 [System32Copy]
 WpdServiceSampleDriver.dll
@@ -73,7 +74,7 @@ WpdServiceSampleDriver.dll
 ; =================== Generic ==================================
 
 [Strings]
-MSFTWUDF="Microsoft Windows Portable Devices"
-Provider="Microsoft WPD"
+Provider="TODO-Set-Provider"
+Mfg="Windows Portable Devices"
 MediaDescription="Windows Portable Device Services Sample Driver Installation Media"
 BasicDeviceName="Windows Portable Device Services Sample Driver"

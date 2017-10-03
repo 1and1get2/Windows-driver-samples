@@ -572,7 +572,7 @@ Note:
 
   //3.4 Initializing the rest of PORT_CONFIGURATION_INFORMATION
     ConfigInfo->MaximumTransferLength = AHCI_MAX_TRANSFER_LENGTH;
-    ConfigInfo->NumberOfPhysicalBreaks = 0x20;
+    ConfigInfo->NumberOfPhysicalBreaks = 0x21;  // Since "NumberOfPhysicalBreaks" has been used in storage stack as the count of entries, use value of physical breaks plus one.
     ConfigInfo->AlignmentMask = 1;              // ATA devices need WORD alignment
     ConfigInfo->ScatterGather = TRUE;
     ConfigInfo->ResetTargetSupported = TRUE;
@@ -791,7 +791,7 @@ AhciHwInitialize (
     //
     perfConfigData.Version = STOR_PERF_VERSION;
     perfConfigData.Size = sizeof(PERF_CONFIGURATION_DATA);
-
+    
     status = StorPortInitializePerfOpts(AdapterExtension, TRUE, &perfConfigData);
 
     //
@@ -829,19 +829,20 @@ AhciHwInitialize (
                 perfConfigData.MessageTargets = adapterExtension->MessageGroupAffinity;
             }
 
-            //
-            // Support concurrent channel so that ports can have StartIo routine running concurrently.
-            //
-            perfConfigData.Flags |= STOR_PERF_CONCURRENT_CHANNELS;
-            perfConfigData.ConcurrentChannels = (adapterExtension->PortImplemented + 1);
-
         }
+
+        //
+        // Support concurrent channel so that ports can have StartIo routine running concurrently.
+        //
+        perfConfigData.Flags |= STOR_PERF_CONCURRENT_CHANNELS;
+        perfConfigData.ConcurrentChannels = NumberOfSetBits(adapterExtension->PortImplemented);
 
         status = StorPortInitializePerfOpts(AdapterExtension, FALSE, &perfConfigData);
 
         NT_ASSERT(status == STOR_STATUS_SUCCESS);
     }
 #endif
+
     //
     // async process to get all ports into running state
     //
@@ -858,6 +859,9 @@ AhciHwPassiveInitialize (
     UCHAR i;
     ULONG status = STOR_STATUS_SUCCESS;
     BOOLEAN enableD3Cold = FALSE;
+    BOOLEAN d3ColdSupported = FALSE;
+    BOOLEAN reportF1State = FALSE;
+    ULONG bufferSize = sizeof(STOR_POFX_DEVICE_V2);
 
     PAHCI_ADAPTER_EXTENSION adapterExtension = (PAHCI_ADAPTER_EXTENSION)AdapterExtension;
 
@@ -873,9 +877,24 @@ AhciHwPassiveInitialize (
     AhciAdapterEvaluateDSMMethod(adapterExtension);
 
 
+    //
+    // Get and cache D3Cold support.  
+    //
+    status = StorPortGetD3ColdSupport(AdapterExtension,
+                                        NULL,
+                                        &d3ColdSupported);
+    if (status == STOR_STATUS_SUCCESS) {
+        adapterExtension->StateFlags.D3ColdSupported = d3ColdSupported;
+    }
+
+
+    if (reportF1State) {
+        bufferSize += STOR_POFX_COMPONENT_IDLE_STATE_SIZE;
+    }
+
     // 3. allocate STOR_POFX_DEVICE data structure for adapter, initialize the structure and register for runtime power management.
     status = StorPortAllocatePool(AdapterExtension,
-                                  sizeof(STOR_POFX_DEVICE_V2),
+                                  bufferSize,
                                   AHCI_POOL_TAG,
                                   (PVOID*)&adapterExtension->PoFxDevice);
 
@@ -892,14 +911,14 @@ AhciHwPassiveInitialize (
     if (IsD3ColdAllowed(adapterExtension)) {
         adapterExtension->PoFxDevice->Flags = STOR_POFX_DEVICE_FLAG_ENABLE_D3_COLD;
     }
-
+    
     // indicate dump miniport can't bring adapter to active
     adapterExtension->PoFxDevice->Flags |= STOR_POFX_DEVICE_FLAG_NO_DUMP_ACTIVE;
 
     adapterExtension->PoFxDevice->Components[0].Version = STOR_POFX_COMPONENT_VERSION_V1;
     adapterExtension->PoFxDevice->Components[0].Size = STOR_POFX_COMPONENT_SIZE;
-    adapterExtension->PoFxDevice->Components[0].FStateCount = 1;
-    adapterExtension->PoFxDevice->Components[0].DeepestWakeableFState = 0;
+    adapterExtension->PoFxDevice->Components[0].FStateCount = reportF1State ? 2 : 1;
+    adapterExtension->PoFxDevice->Components[0].DeepestWakeableFState = reportF1State ? 1 : 0;
     adapterExtension->PoFxDevice->Components[0].Id = STORPORT_POFX_ADAPTER_GUID;
 
     adapterExtension->PoFxDevice->Components[0].FStates[0].Version = STOR_POFX_COMPONENT_IDLE_STATE_VERSION_V1;
@@ -907,6 +926,15 @@ AhciHwPassiveInitialize (
     adapterExtension->PoFxDevice->Components[0].FStates[0].TransitionLatency = 0;
     adapterExtension->PoFxDevice->Components[0].FStates[0].ResidencyRequirement = 0;
     adapterExtension->PoFxDevice->Components[0].FStates[0].NominalPower = STOR_POFX_UNKNOWN_POWER;
+
+    if (reportF1State) {
+        adapterExtension->StateFlags.UseAdapterF1InsteadOfD3 = FALSE;
+        adapterExtension->PoFxDevice->Components[0].FStates[1].Version = STOR_POFX_COMPONENT_IDLE_STATE_VERSION_V1;
+        adapterExtension->PoFxDevice->Components[0].FStates[1].Size = STOR_POFX_COMPONENT_IDLE_STATE_SIZE;
+        adapterExtension->PoFxDevice->Components[0].FStates[1].TransitionLatency = 1;
+        adapterExtension->PoFxDevice->Components[0].FStates[1].ResidencyRequirement = 0;
+        adapterExtension->PoFxDevice->Components[0].FStates[1].NominalPower = STOR_POFX_UNKNOWN_POWER;
+    }
 
     // registry runtime power management for Adapter
     status = StorPortInitializePoFxPower(AdapterExtension, NULL, (PSTOR_POFX_DEVICE)adapterExtension->PoFxDevice, &enableD3Cold);
@@ -920,10 +948,10 @@ AhciHwPassiveInitialize (
         goto Exit;
     }
 
+
     // register success
     adapterExtension->StateFlags.PoFxEnabled = TRUE;
     adapterExtension->StateFlags.PoFxActive = TRUE;
-
 
 Exit:
     return TRUE;
@@ -1170,6 +1198,9 @@ Return Value:
             if (ScsiAdapterPoFxPowerActive < controlTypeList->MaxControlType) {
                 controlTypeList->SupportedTypeList[ScsiAdapterPoFxPowerActive] = TRUE;
             }
+            if (ScsiAdapterPoFxPowerSetFState < controlTypeList->MaxControlType) {
+                controlTypeList->SupportedTypeList[ScsiAdapterPoFxPowerSetFState] = TRUE;
+            }
             if (ScsiAdapterPower < controlTypeList->MaxControlType) {
                 controlTypeList->SupportedTypeList[ScsiAdapterPower] = TRUE;
             }
@@ -1179,6 +1210,10 @@ Return Value:
             if (ScsiAdapterSystemPowerHints < controlTypeList->MaxControlType) {
                 controlTypeList->SupportedTypeList[ScsiAdapterSystemPowerHints] = TRUE;
             }
+            if (ScsiAdapterSurpriseRemoval < controlTypeList->MaxControlType) {
+                controlTypeList->SupportedTypeList[ScsiAdapterSurpriseRemoval] = TRUE;
+            }
+
             break;
 
         // ScsiStopAdapter maybe called with PnP or Power activities.
@@ -1227,6 +1262,10 @@ Return Value:
                     }
                 }
             }
+            break;
+        }
+
+        case ScsiAdapterPoFxPowerSetFState: {
             break;
         }
 
@@ -1284,6 +1323,16 @@ Return Value:
             break;
         }
 
+        case ScsiAdapterSurpriseRemoval: {
+            //
+            // For AHCI, all the cleanup that needs to happen for adapter surprise removals is done in
+            // the several ScsiUnitSurpriseRemovals that will be sent down for each LUN. There is no
+            // extra work needed to handle adapter surprise removals.
+            //
+            status = ScsiAdapterControlSuccess;
+            break;
+        }
+
         default:
             status = ScsiAdapterControlUnsuccessful;
             break;
@@ -1304,7 +1353,7 @@ AhciHwResetBus (
 */
 {
     BOOLEAN status = FALSE;
-    STOR_LOCK_HANDLE lockhandle = {0};
+    STOR_LOCK_HANDLE lockhandle = {InterruptLock, 0};
     PAHCI_ADAPTER_EXTENSION adapterExtension = (PAHCI_ADAPTER_EXTENSION)AdapterExtension;
 
     if ( IsPortValid(adapterExtension, PathId) ) {
@@ -1326,32 +1375,97 @@ AhciHwBuildIo (
     PAHCI_ADAPTER_EXTENSION adapterExtension = (PAHCI_ADAPTER_EXTENSION)AdapterExtension;
     PAHCI_CHANNEL_EXTENSION channelExtension = NULL;
     UCHAR                   pathId = SrbGetPathId(Srb);
-    PVOID                   srbSenseBuffer = NULL;
-    UCHAR                   srbSenseBufferLength = 0;
+    ULONG                   function = SrbGetSrbFunction(Srb);
+    ULONG                   srbFlags = SrbGetSrbFlags(Srb);
+    PAHCI_SRB_EXTENSION     srbExtension = GetSrbExtension((PSTORAGE_REQUEST_BLOCK)Srb);
 
     //
     // Make sure the incoming Srb with the expected type
     //
     NT_ASSERT(Srb->Function == SRB_FUNCTION_STORAGE_REQUEST_BLOCK);
 
+    //
+    // SrbStatus value should have been set to pending.
+    //
+    NT_ASSERT(Srb->SrbStatus == SRB_STATUS_PENDING);
+
     // SrbExtension is not Null-ed by Storport, so do it here.
-    AhciZeroMemory((PCHAR)GetSrbExtension((PSTORAGE_REQUEST_BLOCK)Srb), sizeof(AHCI_SRB_EXTENSION));
-
-    RequestGetSrbScsiData((PSTORAGE_REQUEST_BLOCK)Srb, NULL, NULL, &srbSenseBuffer, &srbSenseBufferLength);
-
-    if ((srbSenseBuffer != NULL) && (srbSenseBufferLength > 0)) {
-        AhciZeroMemory((PCHAR)srbSenseBuffer, srbSenseBufferLength);
-    }
+    AhciZeroMemory((PCHAR)srbExtension, sizeof(AHCI_SRB_EXTENSION));
 
     channelExtension = adapterExtension->PortExtension[pathId];
 
     if ( IsPortValid(adapterExtension, pathId) &&
-         (SrbGetSrbFunction(Srb) == SRB_FUNCTION_EXECUTE_SCSI) &&
+         (function == SRB_FUNCTION_EXECUTE_SCSI) &&
          (channelExtension->StateFlags.PowerDown == TRUE)) {
         AhciPortPowerUp(channelExtension);
     }
 
-    return TRUE;
+    //
+    // Prepare the Device Command before StartIo routine for SRB_FUNCTION_IO_CONTROL and SRB_FUNCTION_EXECUTE_SCSI requests.
+    // This can reduce the lock contention between StartIo and Interrupt locks.
+    //
+    if ((function == SRB_FUNCTION_EXECUTE_SCSI) ||
+        ((function == SRB_FUNCTION_IO_CONTROL) && ((srbFlags & SRB_IOCTL_FLAGS_ADAPTER_REQUEST) == 0))) {
+
+        if ( !IsPortValid(adapterExtension, pathId) ) {
+            Srb->SrbStatus = SRB_STATUS_NO_DEVICE;
+            goto exit;
+        }
+    }
+
+    switch (function) {
+        case SRB_FUNCTION_IO_CONTROL: {
+
+            if ((srbFlags & SRB_IOCTL_FLAGS_ADAPTER_REQUEST) == 0) {
+
+                IOCTLtoATA(adapterExtension->PortExtension[pathId], (PSTORAGE_REQUEST_BLOCK)Srb);
+
+                if (srbExtension->AtaFunction != 0) {
+                    if ( ( srbExtension->Sgl == NULL ) && ( IsDataTransferNeeded((PSTORAGE_REQUEST_BLOCK)Srb) )  ) {
+                        srbExtension->Sgl = (PLOCAL_SCATTER_GATHER_LIST)StorPortGetScatterGatherList(adapterExtension, Srb);
+                    }
+                }
+            }
+
+            break;
+        }
+
+        case SRB_FUNCTION_EXECUTE_SCSI: {
+
+            SCSItoATA(adapterExtension->PortExtension[pathId], (PSTORAGE_REQUEST_BLOCK)Srb);
+
+            if (srbExtension->AtaFunction != 0) {
+                if ( ( srbExtension->Sgl == NULL ) && ( IsDataTransferNeeded((PSTORAGE_REQUEST_BLOCK)Srb) )  ) {
+                    srbExtension->Sgl = (PLOCAL_SCATTER_GATHER_LIST)StorPortGetScatterGatherList(adapterExtension, Srb);
+                }
+            }
+
+            break;
+        }
+
+        default: {
+            //
+            // All other requests will be processed in StartIo routine.
+            //
+            break;
+        }
+    }
+
+exit:
+
+    if (Srb->SrbStatus != SRB_STATUS_PENDING) {
+        //
+        // This routine should return FALSE when SRB is completed.
+        //
+        StorPortNotification(RequestComplete, AdapterExtension, Srb);
+
+        return FALSE;
+    } else {
+        //
+        // This routine should return TRUE when SRB is not completed.
+        //
+        return TRUE;
+    }
 }
 
 BOOLEAN
@@ -1367,7 +1481,7 @@ AhciHwStartIo (
 
 */
 {
-    STOR_LOCK_HANDLE lockhandle = {0};
+    STOR_LOCK_HANDLE lockhandle = {InterruptLock, 0};
     PAHCI_ADAPTER_EXTENSION adapterExtension = (PAHCI_ADAPTER_EXTENSION)AdapterExtension;
     ULONG function = SrbGetSrbFunction(Srb);
     UCHAR pathId = SrbGetPathId(Srb);
@@ -1526,37 +1640,9 @@ AhciHwStartIo (
             break;
         }
 
-        case SRB_FUNCTION_IO_CONTROL: {
-                PAHCI_SRB_EXTENSION srbExtension = GetSrbExtension((PSTORAGE_REQUEST_BLOCK)Srb);
-
-                IOCTLtoATA(adapterExtension->PortExtension[pathId], (PSTORAGE_REQUEST_BLOCK)Srb);
-                if (srbExtension->AtaFunction != 0) {
-                    if ( ( srbExtension->Sgl == NULL ) && ( IsDataTransferNeeded((PSTORAGE_REQUEST_BLOCK)Srb) )  ) {
-                        srbExtension->Sgl = (PLOCAL_SCATTER_GATHER_LIST)StorPortGetScatterGatherList(adapterExtension, Srb);
-                    }
-                    processIO = TRUE;
-                } else {
-                    // complete Srb if no command should be sent to device.
-                    NT_ASSERT(Srb->SrbStatus != SRB_STATUS_PENDING);
-                    StorPortNotification(RequestComplete, AdapterExtension, Srb);
-                }
-                break;
-            }
-
+        case SRB_FUNCTION_IO_CONTROL:
         case SRB_FUNCTION_EXECUTE_SCSI: {
-                PAHCI_SRB_EXTENSION srbExtension = GetSrbExtension((PSTORAGE_REQUEST_BLOCK)Srb);
-
-                SCSItoATA(adapterExtension->PortExtension[pathId], (PSTORAGE_REQUEST_BLOCK)Srb);
-                if (srbExtension->AtaFunction != 0) {
-                    if ( ( srbExtension->Sgl == NULL ) && ( IsDataTransferNeeded((PSTORAGE_REQUEST_BLOCK)Srb) )  ) {
-                        srbExtension->Sgl = (PLOCAL_SCATTER_GATHER_LIST)StorPortGetScatterGatherList(adapterExtension, Srb);
-                    }
-                    processIO = TRUE;
-                } else {
-                    // complete Srb if no command should be sent to device.
-                    NT_ASSERT(Srb->SrbStatus != SRB_STATUS_PENDING);
-                    StorPortNotification(RequestComplete, AdapterExtension, Srb);
-                }
+                processIO = TRUE;
                 break;
             }
 
@@ -1661,82 +1747,12 @@ AhciHwStartIo (
             PortAcquireActiveReference(adapterExtension->PortExtension[pathId], (PSTORAGE_REQUEST_BLOCK)Srb, NULL);
         }
 
-        AhciInterruptSpinlockAcquire(adapterExtension, pathId, &lockhandle);
-        AddQueue(adapterExtension->PortExtension[pathId], &adapterExtension->PortExtension[pathId]->SrbQueue, (PSTORAGE_REQUEST_BLOCK)Srb, 0xDEADBEEF, 0x11);
-        AhciGetNextIos(adapterExtension->PortExtension[pathId], TRUE);
-        AhciInterruptSpinlockRelease(adapterExtension, pathId, &lockhandle);
+        AhciProcessIo(adapterExtension->PortExtension[pathId], (PSTORAGE_REQUEST_BLOCK)Srb, FALSE);
+        ActivateQueue(adapterExtension->PortExtension[pathId], FALSE);
+
     }
 
     return TRUE;
-}
-
-VOID
-AhciGetNextIos (
-    _In_ PAHCI_CHANNEL_EXTENSION ChannelExtension,
-    _In_ BOOLEAN AtDIRQL
-    )
-/*
-    get Srb from queue and program it to adapter.
-
-    assumption: internal request doesn't call this routine. Otherwise, the check of available slot should be changed.
-*/
-{
-    PSTORAGE_REQUEST_BLOCK Srb;
-    BOOLEAN keepFilling;
-    ULONG i, commandSlotMask, allocated;
-
-  //1.0 Check if command processing should happen.  If not, this function will be called again when it is ready.
-    if (ChannelExtension->StartState.ChannelNextStartState != StartComplete) {
-        //We could be waiting ... but it is possible there is no device.  If we know there is no device, then fail all commands.
-        if (ChannelExtension->StartState.ChannelNextStartState == StartFailed) {
-            // complete all requests still in queue
-            AhciPortFailAllIos(ChannelExtension, SRB_STATUS_NO_DEVICE, AtDIRQL);
-        }
-        return;
-    }
-
-    if (ChannelExtension->StateFlags.PowerDown == TRUE) {
-        //We should wait for device to power up.
-        return;
-    }
-
-  //1.1 Initialize Variables
-    commandSlotMask = 0;
-
-    //If there is a command in the Srb Queue ...
-    if (ChannelExtension->SrbQueue.Head != NULL) {
-        keepFilling = TRUE;
-        //get a mask of all slots expect slot 0, which is reserved for internal use
-        for (i = 1; i <= ChannelExtension->AdapterExtension->CAP.NCS; i++) {
-            commandSlotMask |= ( 1 << i );
-        }
-    } else {
-        keepFilling = FALSE;
-    }
-
-    while (keepFilling) {
-        keepFilling = FALSE;
-        allocated = GetOccupiedSlots(ChannelExtension);
-
-        if ((~allocated & commandSlotMask) != 0) {
-            //there is empty slot. get the next IO
-            Srb = RemoveQueue(ChannelExtension, &ChannelExtension->SrbQueue, 0xDEADC0DE, 0x1F);
-            if (Srb != NULL) {
-                NT_ASSERT(SrbGetPathId(Srb) == ChannelExtension->PortNumber);
-                keepFilling = TRUE;
-
-              // get a Srb, try to find an empty slot, fill command table and command header, put Srb into IO slices.
-                AhciProcessIo(ChannelExtension, Srb, AtDIRQL);
-
-            } else {  //No more SRBs.  Finish.
-                keepFilling = FALSE;
-            }
-        }
-    }
-
-  //Check to see if IO is ready to be programmed to adapter
-    ActivateQueue(ChannelExtension, AtDIRQL);
-    return;
 }
 
 VOID
@@ -1838,9 +1854,13 @@ Return Values:
     cmd.AsUlong = 0;
     ssts.AsUlong = 0;
     pxisMask.AsUlong = serrMask.AsUlong = 0;
+    serr.AsUlong = 0;
 
     pxis.AsUlong = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->IS.AsUlong);
-    serr.AsUlong = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->SERR.AsUlong);
+    
+    if (pxis.IFS || pxis.HBDS || pxis.HBFS || pxis.TFES || pxis.PCS || pxis.PRCS) {
+        serr.AsUlong = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->SERR.AsUlong);
+    }
 
     //2.1 Understand interrupts on this channel
     //2.1.1 Handle Fatal Errors: Interface Fatal Error Status || Host Bus Data Error Status || Host Bus Fatal Error Status || Task File Error Status
@@ -1853,7 +1873,10 @@ Return Values:
         sact = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->SACT);
 
 
-        if(sact != 0) {
+        if ((sact == MAXULONG) && IsAdapterRemoved(ChannelExtension)) {
+            // controller has been surprise removed
+            return;
+        } else if (sact != 0) {
           //5.1 NCQ, Handle error processing
             ChannelExtension->StateFlags.CallAhciNcqErrorRecovery = 1;
 
@@ -1861,8 +1884,7 @@ Return Values:
             if (ChannelExtension->StateFlags.NCQ_Succeeded == 0) {
                 ChannelExtension->StateFlags.NCQ_Activated = 0;
             }
-        }
-        else {
+        } else {
             //5.1 Non-NCQ, Handle error processing
             ChannelExtension->StateFlags.CallAhciNonQueuedErrorRecovery = 1;
         }
@@ -1874,12 +1896,16 @@ Return Values:
         pxisMask.AsUlong = 0;
         pxisMask.CPDS = 1;
         StorPortWriteRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->IS.AsUlong, pxisMask.AsUlong);
-        // Handle bus rescan processing processing
+        // Handle bus rescan processing
         ChannelExtension->StateFlags.CallAhciReportBusChange = 1;
     }
 
     if (pxis.DMPS || pxis.PCS) {
         cmd.AsUlong = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->CMD.AsUlong);
+
+        if ((cmd.AsUlong == MAXULONG) && IsAdapterRemoved(ChannelExtension)) {
+            return;
+        }
 
         // Device Mechanical Presence Status
         if (pxis.DMPS) {
@@ -1888,7 +1914,7 @@ Return Values:
             StorPortWriteRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->IS.AsUlong, pxisMask.AsUlong);
             // Mechanical Presence Switch Attached to Port
             if (cmd.MPSP) {
-                // Handle bus rescan processing processing
+                // Handle bus rescan processing
                 ChannelExtension->StateFlags.CallAhciReportBusChange = 1;
             }
         }
@@ -1901,7 +1927,7 @@ Return Values:
             StorPortWriteRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->SERR.AsUlong, serrMask.AsUlong);
             // PCS = 1 could be an unsolicited COMINIT on an already detected drive. See AHCI 6.2.2.3    Recovery of Unsolicited COMINIT
             if (!IgnoreHotPlug(ChannelExtension) && (cmd.ST == 0)) {
-                // Handle bus rescan processing processing
+                // Handle bus rescan processing
                 ChannelExtension->StateFlags.CallAhciReportBusChange = 1;
             }
         }
@@ -1917,6 +1943,11 @@ Return Values:
 
         ssts.AsUlong = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->SSTS.AsUlong);
 
+        if ((ssts.AsUlong == MAXULONG) && IsAdapterRemoved(ChannelExtension)) {
+            // controller has been surprise removed
+            return;
+        }
+
         if (!IgnoreHotPlug(ChannelExtension)) {
             //If a ZPODD drive has already been found and it is a ZPODD system
             if ((ChannelExtension->AdapterExtension->StateFlags.SupportsAcpiDSM == 1) &&
@@ -1931,23 +1962,23 @@ Return Values:
                         // This is precautionary as there shall be no IO when D3 occurred, but the miniport may always create its own commands.
                         ChannelExtension->SlotManager.CommandsToComplete = GetOccupiedSlots(ChannelExtension);
                         ChannelExtension->SlotManager.CommandsIssued = 0;
+                        ChannelExtension->SlotManager.NCQueueSliceIssued = 0;
+                        ChannelExtension->SlotManager.NormalQueueSliceIssued = 0;
+                        ChannelExtension->SlotManager.SingleIoSliceIssued = 0;
                         ChannelExtension->SlotManager.NCQueueSlice = 0;
                         ChannelExtension->SlotManager.NormalQueueSlice = 0;
                         ChannelExtension->SlotManager.SingleIoSlice = 0;
                         ChannelExtension->SlotManager.HighPriorityAttribute = 0;
-                    }
-                    else {
+                    } else {
                         NT_ASSERT(FALSE);     // Looks like a hardware issue, will recover in P_Running_StartAttempt() when ZPODD is powered on again.
                     }
-                }
-                else if (ssts.DET == 3) {
+                } else if (ssts.DET == 3) {
                     // ... (*) and there is presence on the wire ...
                     // ... try to get the channel started.
                     P_Running_StartAttempt(ChannelExtension, TRUE);
                 }
-            }
-            else if ((ssts.DET == 0) && (ssts.IPM == 0)) {
-                // Handle bus rescan processing processing
+            } else if ((ssts.DET == 0) && (ssts.IPM == 0)) {
+                // Handle bus rescan processing
                 ChannelExtension->StateFlags.CallAhciReportBusChange = 1;
             }
         }
@@ -1988,16 +2019,17 @@ Return Values:
         // and this is the only async notification.
         // Notification failure of STOR_STATUS_INVALID_DEVICE_REQUEST is ok as Storport may no longer find
         // the unit as it may have been surprise removed.
-        asyncNotifyFlags = (RAID_ASYNC_NOTIFY_FLAG_MEDIA_STATUS | RAID_ASYNC_NOTIFY_FLAG_DEVICE_STATUS |
-            RAID_ASYNC_NOTIFY_FLAG_DEVICE_OPERATION);
+        asyncNotifyFlags = (RAID_ASYNC_NOTIFY_FLAG_MEDIA_STATUS |
+                            RAID_ASYNC_NOTIFY_FLAG_DEVICE_STATUS |
+                            RAID_ASYNC_NOTIFY_FLAG_DEVICE_OPERATION);
 
         storStatus = StorPortAsyncNotificationDetected(ChannelExtension->AdapterExtension,
                                                         (PSTOR_ADDRESS)&ChannelExtension->DeviceExtension[0].DeviceAddress,
                                                         asyncNotifyFlags);
 
         NT_ASSERT((storStatus == STOR_STATUS_SUCCESS) ||
-                (storStatus == STOR_STATUS_BUSY) ||
-                (storStatus == STOR_STATUS_INVALID_DEVICE_REQUEST));
+                  (storStatus == STOR_STATUS_BUSY) ||
+                  (storStatus == STOR_STATUS_INVALID_DEVICE_REQUEST));
 
         // not actually use this variable.
         UNREFERENCED_PARAMETER(storStatus);
@@ -2029,29 +2061,46 @@ Return Values:
         StorPortWriteRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->IS.AsUlong, pxisMask.AsUlong);
     }
 
-    // preserve taskfile for using in command completion process
-    ChannelExtension->TaskFileData.AsUlong = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->TFD.AsUlong);
-
-    //2.4 error process
+    //3. error process
     if (ErrorRecoveryIsPending(ChannelExtension)) {
+        // preserve taskfile for using in command completion process
+        ChannelExtension->TaskFileData.AsUlong = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->TFD.AsUlong);
+
+        if ((ChannelExtension->TaskFileData.AsUlong == MAXULONG) && IsAdapterRemoved(ChannelExtension)) {
+            // controller has been surprise removed
+            return;
+        }
+
         AhciPortErrorRecovery(ChannelExtension);
     }
+    else {
+        ChannelExtension->TaskFileData.AsUlong = 0x40;
+    }
 
-    //3. Clear channel interrupt
+    //4. Clear channel interrupt
     is = 0;
     is |= (1 << ChannelExtension->PortNumber);
     StorPortWriteRegisterUlong(ChannelExtension->AdapterExtension, ChannelExtension->AdapterExtension->IS, is);
 
-    //4. Complete outstanding commands
+    //5. Complete outstanding commands
     ci = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->CI);
     sact = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->SACT);
 
+    if (((ci == MAXULONG) || (sact == MAXULONG)) && IsAdapterRemoved(ChannelExtension)) {
+        // controller has been surprise removed
+        return;
+    }
+
     outstanding = ci | sact;
 
-    if ((ChannelExtension->SlotManager.CommandsIssued & ~outstanding) > 0) {
+    if ((ChannelExtension->SlotManager.CommandsIssued & (~outstanding)) > 0) {
         // all completed commands by hardware will be marked completed
         ChannelExtension->SlotManager.CommandsToComplete |= (ChannelExtension->SlotManager.CommandsIssued & ~outstanding);
         ChannelExtension->SlotManager.CommandsIssued &= outstanding;
+
+        ChannelExtension->SlotManager.NCQueueSliceIssued &= outstanding;
+        ChannelExtension->SlotManager.NormalQueueSliceIssued &= outstanding;
+        ChannelExtension->SlotManager.SingleIoSliceIssued &= outstanding;
 
         // recording execution history for completing SRB
         RecordInterruptHistory(ChannelExtension, pxis.AsUlong, ssts.AsUlong, serr.AsUlong, ci, sact, 0x20000005);   //AhciHwInterrupt complete IO
@@ -2063,12 +2112,14 @@ Return Values:
     }
 
     //6.1 Partial to Slumber auto transit
-    cmd.AsUlong = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->CMD.AsUlong);
+    if ((outstanding == 0) && 
+        PartialToSlumberTransitionIsAllowed(ChannelExtension, &cmd)) {
 
-    if (PartialToSlumberTransitionIsAllowed(ChannelExtension, cmd, ci, sact)) {
         ULONG status;
+
         // convert interval value from ms to us. allow 20ms of coalescing with other timers
         status = StorPortRequestTimer(ChannelExtension->AdapterExtension, ChannelExtension->WorkerTimer, AhciAutoPartialToSlumber, ChannelExtension, ChannelExtension->AutoPartialToSlumberInterval * 1000, 20000);
+            
         if (status == STOR_STATUS_SUCCESS) {
             StorPortDebugPrint(3, "StorAHCI - LPM: Port %02d - Transit into Slumber from Partial - Scheduled \n", ChannelExtension->PortNumber);
         }
@@ -2111,10 +2162,16 @@ Return Values:
     ULONG                   is;
     ULONG                   interruptPorts;
     ULONG                   i;
+    UCHAR                   interruptPortCount;
 
     PAHCI_ADAPTER_EXTENSION adapterExtension = (PAHCI_ADAPTER_EXTENSION)AdapterExtension;
 
     is = StorPortReadRegisterUlong(AdapterExtension, adapterExtension->IS);
+        
+    if (adapterExtension->StateFlags.Removed) {
+        return FALSE;
+    }
+
     interruptPorts = (is & adapterExtension->PortImplemented);
 
     //
@@ -2124,11 +2181,17 @@ Return Values:
         return FALSE;
     }
 
+    interruptPortCount = NumberOfSetBits(interruptPorts);
+
     //
     // In case of multi-ports have interrupt pending, using round robin to choose a port handle its interrupt.
     // After this routine exits, other pending interrupts will trigger interrupt again.
     //
-    i = (adapterExtension->LastInterruptedPort + 1) % (adapterExtension->HighestPort + 1);
+    if (interruptPortCount > 1) {
+        i = (adapterExtension->LastInterruptedPort + 1) % (adapterExtension->HighestPort + 1);
+    } else {
+        i = adapterExtension->LastInterruptedPort;
+    }
 
     do {
         if ( ((interruptPorts & (1 << i)) != 0) && IsPortStartCapable(adapterExtension->PortExtension[i]) ) {
@@ -2265,6 +2328,9 @@ Return Value:
             if (ScsiUnitPoFxPowerSetFState < controlTypeList->MaxControlType) {
                 controlTypeList->SupportedTypeList[ScsiUnitPoFxPowerSetFState] = TRUE;
             }
+            if (ScsiUnitSurpriseRemoval < controlTypeList->MaxControlType) {
+                controlTypeList->SupportedTypeList[ScsiUnitSurpriseRemoval] = TRUE;
+            }
             status = ScsiUnitControlSuccess;
             break;
         }
@@ -2361,7 +2427,7 @@ Return Value:
 
                         channelExtension->PoFxDevice->Version = STOR_POFX_DEVICE_VERSION_V3;
                         channelExtension->PoFxDevice->Size = STOR_POFX_DEVICE_V3_SIZE;
-                        channelExtension->PoFxDevice->ComponentCount = 1;    
+                        channelExtension->PoFxDevice->ComponentCount = 1;
 
                         //
                         // The dump version of StorAHCI is not able to bring the
@@ -2506,6 +2572,41 @@ Return Value:
 
             } else {
                 status = ScsiUnitControlUnsuccessful;
+            }
+
+            break;
+        }
+
+        //
+        // ScsiUnitSurpriseRemoval is called when Storport processes the surprise removal IRP for the unit.
+        //
+        case ScsiUnitSurpriseRemoval: {
+            PSTOR_ADDR_BTL8 storAddrBtl8 = (PSTOR_ADDR_BTL8)Parameters;
+            STOR_LOCK_HANDLE lockhandle = {InterruptLock, 0};
+
+            if (IsPortValid(adapterExtension, storAddrBtl8->Path)) {
+
+                PAHCI_CHANNEL_EXTENSION channelExtension = adapterExtension->PortExtension[storAddrBtl8->Path];
+                AhciInterruptSpinlockAcquire(adapterExtension, channelExtension->PortNumber, &lockhandle);
+
+                //
+                // Complete all issued commands.
+                //
+                channelExtension->SlotManager.CommandsToComplete = channelExtension->SlotManager.CommandsIssued;
+                channelExtension->SlotManager.CommandsIssued = 0;
+                channelExtension->SlotManager.NCQueueSliceIssued = 0;
+                channelExtension->SlotManager.NormalQueueSliceIssued = 0;
+                channelExtension->SlotManager.SingleIoSliceIssued = 0;
+                channelExtension->SlotManager.HighPriorityAttribute &= ~channelExtension->SlotManager.CommandsToComplete;
+                
+                AhciCompleteIssuedSRBs(channelExtension, SRB_STATUS_NO_DEVICE, TRUE); 
+
+                //
+                // Complete all other commands miniport owns for this device.
+                //
+                AhciPortFailAllIos(channelExtension, SRB_STATUS_NO_DEVICE, TRUE);
+
+                AhciInterruptSpinlockRelease(adapterExtension, channelExtension->PortNumber, &lockhandle);
             }
 
             break;

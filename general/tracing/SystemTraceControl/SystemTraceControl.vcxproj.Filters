@@ -3,20 +3,23 @@
   <ItemGroup>
     <Filter Include="Source Files">
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx;*</Extensions>
-      <UniqueIdentifier>{C2A52F8F-D414-40D4-998E-62C57FFF543E}</UniqueIdentifier>
+      <UniqueIdentifier>{CA2B3951-E1B8-494F-93BB-603ACAB74855}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files">
       <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
-      <UniqueIdentifier>{CF32093A-DFB7-4C18-B086-1F1DB68AA8F4}</UniqueIdentifier>
+      <UniqueIdentifier>{EA9117C8-07C0-4427-A610-83A12B10202F}</UniqueIdentifier>
     </Filter>
     <Filter Include="Resource Files">
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms;man;xml</Extensions>
-      <UniqueIdentifier>{C370B48B-D85C-4319-911D-CC6D213BB287}</UniqueIdentifier>
+      <UniqueIdentifier>{3DBF8590-C024-4409-9170-2CE16201AA6F}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SystemTraceControl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ReadMe.txt" />
   </ItemGroup>
 </Project>

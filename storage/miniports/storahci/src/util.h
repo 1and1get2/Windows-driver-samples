@@ -616,16 +616,37 @@ DeviceIncursSeekPenalty(
 _In_ PAHCI_CHANNEL_EXTENSION ChannelExtension
 )
 {
-    if (IsAtaDevice(&ChannelExtension->DeviceExtension->DeviceParameters) &&
-        ChannelExtension->DeviceExtension->IdentifyDeviceData->NominalMediaRotationRate >= 0x0401 &&
-        ChannelExtension->DeviceExtension->IdentifyDeviceData->NominalMediaRotationRate <= 0xFFFE) {
-        //
-        // NominalMediaRotationRate = 0 means no rate is reported.
-        // NominalMediaRotationRate = 1 means there is no seek penalty (e.g. pure SSD).
-        // NominalMediaRotationRate = 0x0401-0xFFFE is the rotation rate (i.e. incurs seek penalty).
-        // All other values are reserved.
-        //
-        return TRUE;
+    if (IsAtaDevice(&ChannelExtension->DeviceExtension->DeviceParameters)) {
+        if (ChannelExtension->DeviceExtension->IdentifyDeviceData->NominalMediaRotationRate >= 0x0401 &&
+            ChannelExtension->DeviceExtension->IdentifyDeviceData->NominalMediaRotationRate <= 0xFFFE) {
+            //
+            // NominalMediaRotationRate = 0 means no rate is reported.
+            // NominalMediaRotationRate = 1 means there is no seek penalty (e.g. pure SSD).
+            // NominalMediaRotationRate = 0x0401-0xFFFE is the rotation rate (i.e. incurs seek penalty).
+            // All other values are reserved.
+            //
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+__inline
+BOOLEAN
+DeviceIncursNoSeekPenalty(
+_In_ PAHCI_CHANNEL_EXTENSION ChannelExtension
+)
+{
+    if (IsAtaDevice(&ChannelExtension->DeviceExtension->DeviceParameters)) {
+        if (ChannelExtension->DeviceExtension->IdentifyDeviceData->NominalMediaRotationRate == 1) {
+            //
+            // NominalMediaRotationRate = 0 means no rate is reported.
+            // NominalMediaRotationRate = 1 means there is no seek penalty (e.g. pure SSD).
+            // NominalMediaRotationRate = 0x0401-0xFFFE is the rotation rate (i.e. incurs seek penalty).
+            // All other values are reserved.
+            //
+            return TRUE;
+        }
     }
     return FALSE;
 }
@@ -1200,16 +1221,12 @@ __inline
 BOOLEAN
 PartialToSlumberTransitionIsAllowed (
     _In_ PAHCI_CHANNEL_EXTENSION ChannelExtension,
-    _In_ AHCI_COMMAND            CMD,
-    _In_ ULONG                   CI,
-    _In_ ULONG                   SACT
+    _In_opt_ PAHCI_COMMAND       CMD
     )
 {
-    if ( (CI != 0) || (SACT != 0) ) {
-        //device still has request pending
-        return FALSE;
-    }
-    
+    PAHCI_COMMAND   cmdRegister = NULL;
+    AHCI_COMMAND    cmd = {0};
+
     if ((ChannelExtension->LastUserLpmPowerSetting  & 0x3) == 0) {
         //Neither HIPM nor DIPM is allowed. e.g. LastUserLpmPowerSetting --- bit 0: HIPM; bit 1: DIPM
         return FALSE;
@@ -1236,12 +1253,6 @@ PartialToSlumberTransitionIsAllowed (
     }
 
 
-    if ( ( (ChannelExtension->AdapterExtension->CAP.SALP == 0) || (CMD.ALPE == 0) ) &&
-         (!IsDeviceSupportsDIPM(ChannelExtension->DeviceExtension[0].IdentifyDeviceData)) ) {
-        //Neither HIPM nor DIPM is enabled.
-        return FALSE;
-    }
-
     if ( ((ChannelExtension->LastUserLpmPowerSetting  & 0x2) != 0) &&
          (ChannelExtension->DeviceExtension->IdentifyDeviceData->SerialAtaCapabilities.DeviceAutoPS == 1) &&
          (ChannelExtension->DeviceExtension->IdentifyDeviceData->SerialAtaFeaturesEnabled.DeviceAutoPS == 1) )   {
@@ -1250,10 +1261,26 @@ PartialToSlumberTransitionIsAllowed (
         return FALSE;
     }
 
+    //
+    // Only access PxCMD register when it's needed.
+    //
+    if ((CMD != NULL) && (CMD->AsUlong != 0)) {
+        cmdRegister = CMD;
+    } else {
+        cmd.AsUlong = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->CMD.AsUlong);
+        cmdRegister = &cmd;
+    }
+
+    if ( ( (ChannelExtension->AdapterExtension->CAP.SALP == 0) || (cmdRegister->ALPE == 0) ) &&
+         (!IsDeviceSupportsDIPM(ChannelExtension->DeviceExtension[0].IdentifyDeviceData)) ) {
+        //Neither HIPM nor DIPM is enabled.
+        return FALSE;
+    }
+
     if ( (ChannelExtension->AdapterExtension->CAP.SALP == 1) &&
-         (CMD.ALPE != 0) &&
-         ( (CMD.ASP == 1) ||
-           ( (ChannelExtension->AdapterExtension->CAP2.APST != 0) && (CMD.APSTE != 0) ) ) ) {
+         (cmdRegister->ALPE != 0) &&
+         ( (cmdRegister->ASP == 1) ||
+           ( (ChannelExtension->AdapterExtension->CAP2.APST != 0) && (cmdRegister->APSTE != 0) ) ) ) {
         // HIPM is enabled. AND
         //     either Host initiates Slumber automatically, OR
         //     Host supports and enabled auto Partial to Slumber.
@@ -1481,6 +1508,23 @@ AtaFormFactorToStorageFormFactor(
 
     return formFactor;
 }
+
+__inline
+BOOLEAN
+IsAdapterRemoved(
+    _In_ PAHCI_CHANNEL_EXTENSION ChannelExtension
+    )
+{
+    //
+    // When the adapter is removed, its registers are read as
+    // all 0xF's by the PCI bus. We use the PxSSTS register because
+    // it has several reserved bits which will unlikely be defined
+    // in the lifetime of the spec.
+    //
+    ULONG ssts = StorPortReadRegisterUlong(ChannelExtension->AdapterExtension, &ChannelExtension->Px->SSTS.AsUlong);
+    return (ssts == MAXULONG);
+}
+
 
 VOID
 PortBusChangeProcess (

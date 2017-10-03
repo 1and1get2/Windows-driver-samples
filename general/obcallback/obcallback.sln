@@ -3,13 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0
 MinimumVisualStudioVersion = 12.0
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Control", "Control", "{D429EFC9-09E8-495C-81B0-32340C75C2BA}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Control", "Control", "{A66A4EE4-C0A3-4557-A39B-9EBDF9EEE095}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Driver", "Driver", "{5DA38202-119A-41F8-B5A6-CB8D38191147}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Driver", "Driver", "{60D4EAED-6467-440B-8BF6-E8537A962604}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ObCallbackTestCtrl", "control\ObCallbackTestCtrl.vcxproj", "{8B053BEE-EA21-4D12-984B-6C93FE6D4992}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ObCallbackTestCtrl", "control\ObCallbackTestCtrl.vcxproj", "{F723CC91-3218-4252-89C1-F7998292C456}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ObCallbackTest", "driver\ObCallbackTest.vcxproj", "{C696D115-0970-4E9C-8FED-31A99E039ED5}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ObCallbackTest", "driver\ObCallbackTest.vcxproj", "{850E3104-6DE2-4FA3-8E53-4CA21A230429}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,28 +19,28 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{8B053BEE-EA21-4D12-984B-6C93FE6D4992}.Debug|Win32.ActiveCfg = Debug|Win32
-		{8B053BEE-EA21-4D12-984B-6C93FE6D4992}.Debug|Win32.Build.0 = Debug|Win32
-		{8B053BEE-EA21-4D12-984B-6C93FE6D4992}.Release|Win32.ActiveCfg = Release|Win32
-		{8B053BEE-EA21-4D12-984B-6C93FE6D4992}.Release|Win32.Build.0 = Release|Win32
-		{8B053BEE-EA21-4D12-984B-6C93FE6D4992}.Debug|x64.ActiveCfg = Debug|x64
-		{8B053BEE-EA21-4D12-984B-6C93FE6D4992}.Debug|x64.Build.0 = Debug|x64
-		{8B053BEE-EA21-4D12-984B-6C93FE6D4992}.Release|x64.ActiveCfg = Release|x64
-		{8B053BEE-EA21-4D12-984B-6C93FE6D4992}.Release|x64.Build.0 = Release|x64
-		{C696D115-0970-4E9C-8FED-31A99E039ED5}.Debug|Win32.ActiveCfg = Debug|Win32
-		{C696D115-0970-4E9C-8FED-31A99E039ED5}.Debug|Win32.Build.0 = Debug|Win32
-		{C696D115-0970-4E9C-8FED-31A99E039ED5}.Release|Win32.ActiveCfg = Release|Win32
-		{C696D115-0970-4E9C-8FED-31A99E039ED5}.Release|Win32.Build.0 = Release|Win32
-		{C696D115-0970-4E9C-8FED-31A99E039ED5}.Debug|x64.ActiveCfg = Debug|x64
-		{C696D115-0970-4E9C-8FED-31A99E039ED5}.Debug|x64.Build.0 = Debug|x64
-		{C696D115-0970-4E9C-8FED-31A99E039ED5}.Release|x64.ActiveCfg = Release|x64
-		{C696D115-0970-4E9C-8FED-31A99E039ED5}.Release|x64.Build.0 = Release|x64
+		{F723CC91-3218-4252-89C1-F7998292C456}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F723CC91-3218-4252-89C1-F7998292C456}.Debug|Win32.Build.0 = Debug|Win32
+		{F723CC91-3218-4252-89C1-F7998292C456}.Release|Win32.ActiveCfg = Release|Win32
+		{F723CC91-3218-4252-89C1-F7998292C456}.Release|Win32.Build.0 = Release|Win32
+		{F723CC91-3218-4252-89C1-F7998292C456}.Debug|x64.ActiveCfg = Debug|x64
+		{F723CC91-3218-4252-89C1-F7998292C456}.Debug|x64.Build.0 = Debug|x64
+		{F723CC91-3218-4252-89C1-F7998292C456}.Release|x64.ActiveCfg = Release|x64
+		{F723CC91-3218-4252-89C1-F7998292C456}.Release|x64.Build.0 = Release|x64
+		{850E3104-6DE2-4FA3-8E53-4CA21A230429}.Debug|Win32.ActiveCfg = Debug|Win32
+		{850E3104-6DE2-4FA3-8E53-4CA21A230429}.Debug|Win32.Build.0 = Debug|Win32
+		{850E3104-6DE2-4FA3-8E53-4CA21A230429}.Release|Win32.ActiveCfg = Release|Win32
+		{850E3104-6DE2-4FA3-8E53-4CA21A230429}.Release|Win32.Build.0 = Release|Win32
+		{850E3104-6DE2-4FA3-8E53-4CA21A230429}.Debug|x64.ActiveCfg = Debug|x64
+		{850E3104-6DE2-4FA3-8E53-4CA21A230429}.Debug|x64.Build.0 = Debug|x64
+		{850E3104-6DE2-4FA3-8E53-4CA21A230429}.Release|x64.ActiveCfg = Release|x64
+		{850E3104-6DE2-4FA3-8E53-4CA21A230429}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{8B053BEE-EA21-4D12-984B-6C93FE6D4992} = {D429EFC9-09E8-495C-81B0-32340C75C2BA}
-		{C696D115-0970-4E9C-8FED-31A99E039ED5} = {5DA38202-119A-41F8-B5A6-CB8D38191147}
+		{F723CC91-3218-4252-89C1-F7998292C456} = {A66A4EE4-C0A3-4557-A39B-9EBDF9EEE095}
+		{850E3104-6DE2-4FA3-8E53-4CA21A230429} = {60D4EAED-6467-440B-8BF6-E8537A962604}
 	EndGlobalSection
 EndGlobal
